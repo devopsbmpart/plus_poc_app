@@ -53,6 +53,15 @@ button { font: inherit; color: inherit; }
 .brand span { font-size: 11px; color: var(--ink-3); }
 .spacer { flex: 1; }
 
+/* 배포 환경 배지 — 지금 보고 있는 화면이 어느 환경인지 한눈에 구분한다.
+   운영과 검증을 헷갈려 조작하는 사고를 막는 장치다. */
+.envbadge {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  padding: 2px 9px; border-radius: 999px; text-transform: uppercase;
+}
+.envbadge[data-env="STG"] { background: var(--upd-bg); color: var(--upd); border: 1px solid var(--upd); }
+.envbadge[data-env="PRD"] { background: var(--deg-bg); color: var(--deg); border: 1px solid var(--deg); }
+
 .search {
   position: relative; width: min(280px, 40vw);
 }

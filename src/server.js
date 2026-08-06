@@ -40,7 +40,8 @@ function buildInfo() {
   const jiraBase = process.env.JIRA_BASE_URL || 'https://okestro.atlassian.net';
 
   return {
-    version: process.env.APP_VERSION || '0.2.0',
+    version: process.env.APP_VERSION || '0.3.0',
+    env: process.env.APP_ENV || null,
     jiraIssue: issue,
     jiraUrl: issue ? `${jiraBase}/browse/${issue}` : null,
     revision,

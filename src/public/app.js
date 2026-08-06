@@ -139,6 +139,14 @@ function renderTable() {
 function renderBuild() {
   const b = state.build;
   if (!b) return;
+
+  // 환경이 주입돼 있으면 상단에 배지로 띄운다.
+  const badge = $('#envbadge');
+  if (b.env) {
+    badge.textContent = b.env;
+    badge.dataset.env = b.env;
+    badge.hidden = false;
+  }
   const item = (label, value, href) => {
     if (!value) return '';
     const text = esc(value);
