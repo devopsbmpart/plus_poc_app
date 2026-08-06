@@ -1,11 +1,32 @@
 name: build
 
-# 플랫폼이 만든 브랜치에 push 되면 이미지를 빌드한다.
-# workflow_run 으로 플랫폼이 이 실행을 수집한다 (S4).
+# 두 가지 경로로 실행된다.
+#  - push: 개발자가 브랜치에 커밋했을 때 (기존 동작)
+#  - workflow_dispatch: 플랫폼이 파이프라인 버튼으로 실행할 때
+#
+# 플랫폼은 브랜치 명명 규칙에 의존하지 않는다. 사람이 만든 브랜치를 쓰는
+# 흐름에서는 규칙이 지켜진다는 보장이 없으므로 inputs 로 직접 주입받는다.
 on:
   push:
     branches: ['**']
   workflow_dispatch:
+    inputs:
+      jira_issue:
+        description: '상관관계 키 (예: TPS-2473)'
+        required: false
+        type: string
+      image_repository:
+        description: '이미지 저장 위치 (예: ghcr.io/owner/repo)'
+        required: false
+        type: string
+      image_tag:
+        description: '이미지 태그'
+        required: false
+        type: string
+      target_env:
+        description: '대상 환경 (stg | prd)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -20,18 +41,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 상관관계 키 추출. 브랜치명이 먼저고, 없으면 커밋 메시지 trailer 를 본다.
-      # 둘 다 없으면 빈 값으로 두고 계속 진행한다. 여기서 실패시키면
+      # 상관관계 키 결정 순서:
+      #   ① 플랫폼이 넘긴 inputs  ② 브랜치명  ③ 커밋 trailer
+      # 셋 다 없으면 빈 값으로 두고 계속한다. 여기서 실패시키면
       # 플랫폼을 거치지 않은 수동 push 가 전부 막힌다.
       - id: correlate
-        name: Jira Issue Key 추출
+        name: Jira Issue Key 결정
         run: |
-          KEY=$(printf '%s' "${GITHUB_REF_NAME}" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1 || true)
+          KEY="${{ inputs.jira_issue }}"
+          SOURCE="inputs"
+          if [ -z "$KEY" ]; then
+            KEY=$(printf '%s' "${GITHUB_REF_NAME}" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1 || true)
+            SOURCE="branch"
+          fi
           if [ -z "$KEY" ]; then
             KEY=$(git log -1 --pretty=%B | grep -oE '^[A-Z][A-Z0-9]+-[0-9]+$' | head -1 || true)
+            SOURCE="trailer"
           fi
           echo "issue=$KEY" >> "$GITHUB_OUTPUT"
-          echo "추출된 Issue Key: ${KEY:-(없음)}"
+          echo "Issue Key: ${KEY:-(없음)}  (출처: ${SOURCE})"
+
+      - id: coords
+        name: 이미지 좌표 결정
+        run: |
+          REPO="${{ inputs.image_repository }}"
+          [ -z "$REPO" ] && REPO="ghcr.io/${GITHUB_REPOSITORY}"
+          TAG="${{ inputs.image_tag }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_SHA}"
+          echo "repo=$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "이미지: ${REPO}:${TAG}"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -41,14 +80,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 태그가 아니라 digest 로 고정하는 것이 규칙 4 다.
-      # 여기서는 digest 를 출력으로 내보내고, GitOps 커밋은 플랫폼이 한다 (S6).
+      # tag 가 아니라 digest 로 고정하는 것이 규칙 4 다.
+      # 여기서는 digest 를 출력으로 내보내고 GitOps 커밋은 플랫폼이 한다.
       - id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ steps.coords.outputs.repo }}:${{ steps.coords.outputs.tag }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -62,6 +101,8 @@ jobs:
             echo "| 항목 | 값 |"
             echo "|---|---|"
             echo "| Jira Issue | ${{ steps.correlate.outputs.issue }} |"
+            echo "| 환경 | ${{ inputs.target_env || '(push)' }} |"
+            echo "| 이미지 | \`${{ steps.coords.outputs.repo }}:${{ steps.coords.outputs.tag }}\` |"
             echo "| Digest | \`${{ steps.build.outputs.digest }}\` |"
             echo "| Revision | ${{ github.sha }} |"
           } >> "$GITHUB_STEP_SUMMARY"
