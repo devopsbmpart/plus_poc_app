@@ -1,9 +1,10 @@
 {
   "name": "plus-poc-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node src/server.js"
-  }
+  },
+  "description": "Trombone 워크로드 콘솔 — PoC 배포 대상 애플리케이션"
 }
