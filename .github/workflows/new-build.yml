@@ -21,6 +21,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # GitHub repository settings에서 build-queue Environment에
+    # Required reviewers 또는 deployment protection rule을 설정해야
+    # dispatch 직후 job이 Waiting 상태로 멈춘다.
+    environment:
+      name: build-queue
     env:
       IMAGE_REPOSITORY: ${{ inputs.image_repository || format('ghcr.io/{0}', github.repository) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
