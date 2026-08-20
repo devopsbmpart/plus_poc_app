@@ -3,8 +3,8 @@ name: build
 # HTTP 흐름이 티켓/저장소별로 호출한다.
 run-name: "[${{ inputs.ticket_no || 'push' }}] ${{ inputs.repository_name || github.event.repository.name }}"
 on:
-  ######################
-  ##### 추후 수정 ######
+  #######################
+  ##### 추후 수정  ######
   #######################
   push:
     branches: ['develop']
@@ -31,21 +31,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Docker Hub namespace는 고정하고 저장소명만 입력받는다.
       IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
     steps:
       # 저장소 소스를 가져온다.
       - uses: actions/checkout@v4
 
+
+      #######################
+      ###### GHCR       #####
+      #######################
       # GHCR 로그인: 임시 비활성화.
       # - uses: docker/login-action@v3
       #   with:
       #     registry: ghcr.io
       #     username: ${{ github.actor }}
       #     password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Docker Hub에 인증한다.
+      #
+      #######################
+      ###### Docker Hub #####
+      #######################
       - uses: docker/login-action@v3
         with:
           registry: docker.io
