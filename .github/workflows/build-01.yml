@@ -22,6 +22,12 @@ on:
         description: 이미지 태그
         required: false
         type: string
+      target_env:
+        description: GitOps 대상 환경
+        required: false
+        default: stg
+        type: choice
+        options: [stg, hk, prd]
 
 # 소스 조회만 허용한다. GHCR 사용 시 packages: write를 되살린다.
 permissions:
@@ -33,14 +39,16 @@ jobs:
     env:
       IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+      TARGET_ENV: ${{ inputs.target_env || 'stg' }}
     steps:
-      # 저장소 소스를 가져온다.
+      #############################
+      ### Checkout     ############
+      #############################
       - uses: actions/checkout@v4
 
-
-      #######################
-      ###### GHCR       #####
-      #######################
+      #############################
+      ### Login Registry: GHCR#####
+      #############################
       # GHCR 로그인: 임시 비활성화.
       # - uses: docker/login-action@v3
       #   with:
@@ -48,16 +56,18 @@ jobs:
       #     username: ${{ github.actor }}
       #     password: ${{ secrets.GITHUB_TOKEN }}
       #
-      #######################
-      ###### Docker Hub #####
-      #######################
+      ####################################
+      ### Login Registry: Docker Hub #####
+      ####################################
       - uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 이미지를 빌드하고 push한다.
+      #############################
+      ### Build / Push ############
+      #############################
       - id: build
         uses: docker/build-push-action@v6
         with:
@@ -68,3 +78,48 @@ jobs:
       # 화면/로그에서 이미지와 digest를 확인한다.
       - run: |
           echo "Image: ${IMAGE_REPOSITORY}:${IMAGE_TAG} / Digest: ${{ steps.build.outputs.digest }}"
+
+      #############################
+      ### Checkout     ############
+      #############################
+      - uses: actions/checkout@v4
+        with:
+          repository: devopsbmpart/plus_poc_gitops
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      #############################
+      ### modify manifest #########
+      #############################
+      - name: Update GitOps manifest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          manifest="apps/plus-poc-app-${TARGET_ENV}/deployment.yaml"
+          manifest_file="gitops/${manifest}"
+          image_ref="${IMAGE_REPOSITORY}@${DIGEST}"
+
+          # 대상 환경의 manifest와 이미지 digest를 검증한다.
+          test -f "$manifest_file"
+          test -n "$DIGEST"
+
+          # image 전체를 Docker Hub 이미지 ref로 교체한다.
+          IMAGE_REF="$image_ref" perl -pi -e 's|^(\s*image:\s*).*$|$1$ENV{IMAGE_REF}|m' "$manifest_file"
+
+          # IMAGE_DIGEST 항목만 새 digest로 교체한다.
+          DIGEST="$DIGEST" perl -0pi -e 's|(\n\s*- name: IMAGE_DIGEST\s*\n\s*value:\s*)sha256:[^\n]+|$1$ENV{DIGEST}|m' "$manifest_file"
+
+          grep -Fq "image: ${image_ref}" "$manifest_file"
+          grep -Fq "value: ${DIGEST}" "$manifest_file"
+
+          if git -C gitops diff --quiet -- "$manifest"; then
+            echo "Manifest is already up to date."
+            exit 0
+          fi
+
+          git -C gitops config user.name github-actions[bot]
+          git -C gitops config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C gitops add "$manifest"
+          git -C gitops commit -m "chore(deploy): ${TARGET_ENV} image digest update"
+          git -C gitops push origin main
