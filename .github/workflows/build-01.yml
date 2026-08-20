@@ -42,10 +42,10 @@ jobs:
       IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
       TARGET_ENV: ${{ inputs.target_env || 'stg' }}
-      # MANIFEST_PATH: apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
-      # MANIFEST_FILE: apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
+      # MANIFEST_PATH는 GitOps 저장소 기준, MANIFEST_FILE은 workspace 기준이다.
       MANIFEST_PATH: apps/plus-poc-app-hk/deployment.yaml
-      MANIFEST_FILE: apps/plus-poc-app-hk/deployment.yaml
+      MANIFEST_FILE: gitops/apps/plus-poc-app-hk/deployment.yaml
+
     steps:
       #############################
       ### Checkout Source #########
@@ -92,8 +92,8 @@ jobs:
         with:
           repository: devopsbmpart/plus_poc_gitops
           ref: main
-          # token: ${{ secrets.GITOPS_TOKEN }}
-          # path: gitops
+          token: ${{ secrets.REPOSITORY_ACCESS_TOKEN }}
+          path: gitops
 
       #############################
       ### Modify Manifest #########
