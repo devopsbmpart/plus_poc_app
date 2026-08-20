@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Docker Hub namespace는 고정하고 저장소명만 입력받는다.
-      IMAGE_REPOSITORY: ${{ format('docker.io/devopsbmpart/{0}', inputs.repository_name || github.event.repository.name) }}
+      IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
     steps:
       # 저장소 소스를 가져온다.
