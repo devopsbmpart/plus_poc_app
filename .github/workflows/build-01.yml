@@ -90,8 +90,8 @@ jobs:
         with:
           repository: devopsbmpart/plus_poc_gitops
           ref: main
-          token: ${{ secrets.GITOPS_TOKEN }}
-          path: gitops
+          # token: ${{ secrets.GITOPS_TOKEN }}
+          # path: gitops
 
       #############################
       ### Modify Manifest #########
