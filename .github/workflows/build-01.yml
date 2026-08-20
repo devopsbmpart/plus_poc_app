@@ -1,0 +1,62 @@
+name: build
+
+# HTTP 흐름이 티켓/저장소별로 호출한다.
+run-name: "[${{ inputs.ticket_no }}] ${{ inputs.repository_name }}"
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_no:
+        description: 티켓 번호
+        required: true
+        type: string
+      repository_name:
+        description: 저장소 이름
+        required: true
+        type: string
+      image_repository:
+        description: 이미지 저장 위치
+        required: false
+        type: string
+      image_tag:
+        description: 이미지 태그
+        required: false
+        type: string
+
+# 소스 조회만 허용한다. GHCR 사용 시 packages: write를 되살린다.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # build-queue 보호 규칙이 있으면 실행 전 대기한다.
+    environment: build-queue
+    steps:
+      # 저장소 소스를 가져온다.
+      - uses: actions/checkout@v4
+
+      # GHCR 로그인: 임시 비활성화.
+      # - uses: docker/login-action@v3
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub에 인증한다.
+      - uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 이미지를 빌드하고 push한다.
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ inputs.image_repository || format('docker.io/{0}/{1}', secrets.DOCKERHUB_USERNAME, github.event.repository.name) }}:${{ inputs.image_tag || github.sha }}
+
+      # 화면/로그에서 이미지와 digest를 확인한다.
+      - run: |
+          echo "Image: ${{ inputs.image_repository || format('docker.io/{0}/{1}', secrets.DOCKERHUB_USERNAME, github.event.repository.name) }}:${{ inputs.image_tag || github.sha }} / Digest: ${{ steps.build.outputs.digest }}"
