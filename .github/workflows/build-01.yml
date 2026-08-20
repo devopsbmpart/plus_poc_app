@@ -3,6 +3,11 @@ name: build
 # HTTP 흐름이 티켓/저장소별로 호출한다.
 run-name: "[${{ inputs.ticket_no }}] ${{ inputs.repository_name }}"
 on:
+  ######################
+  ##### 추후 수정 ######
+  #######################
+  push:
+    branches: ['develop']
   workflow_dispatch:
     inputs:
       ticket_no:
