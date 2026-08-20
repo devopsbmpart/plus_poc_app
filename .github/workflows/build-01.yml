@@ -1,10 +1,8 @@
 name: build
 
-# HTTP dispatch 또는 develop push로 실행한다.
-run-name: "[${{ inputs.ticket_no || 'push' }}] ${{ inputs.repository_name || github.event.repository.name }}"
+# GitHub Actions API의 workflow_dispatch로만 실행한다.
+run-name: "[${{ inputs.ticket_no }}] ${{ inputs.repository_name }}"
 on:
-  push:
-    branches: ['develop']
   workflow_dispatch:
     inputs:
       ticket_no:
@@ -19,19 +17,13 @@ on:
         description: 이미지 태그
         required: false
         type: string
-      target_env:
-        description: GitOps 대상 환경
-        required: false
-        default: stg
-        type: choice
-        options: [stg, hk, prd]
 
 # 소스 조회만 허용한다. Docker Hub 인증은 Secret을 사용한다.
 permissions:
   contents: read
 
 concurrency:
-  group: build-01-gitops-${{ inputs.target_env || 'stg' }}
+  group: build-01-gitops
   cancel-in-progress: false
   queue: max
 
@@ -41,21 +33,23 @@ jobs:
     env:
       IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
-      TARGET_ENV: ${{ inputs.target_env || 'stg' }}
-      # MANIFEST_PATH는 GitOps 저장소 기준, MANIFEST_FILE은 workspace 기준이다.
+      # MANIFEST_PATH는 GitOps 저장소 기준 경로다.
+      # NOTE: MANIFEST REPO 수정시 변경 필요
+      MANIFEST_REPO: devopsbmpart/plus_poc_gitops
+      MANIFEST_REF: main
+      MANIFEST_CHECKOUT_PATH: gitops
       MANIFEST_PATH: apps/plus-poc-app-hk/deployment.yaml
-      MANIFEST_FILE: gitops/apps/plus-poc-app-hk/deployment.yaml
 
     steps:
       #############################
       ### Checkout Source #########
       #############################
-      # 애플리케이션 소스를 checkout한다.
       - uses: actions/checkout@v4
 
-      #############################
+      # NOTE: 레지스트리 수정시 변경 필요
+      ##############################
       ### Login Registry: GHCR #####
-      #############################
+      ##############################
       # GHCR 로그인: 임시 비활성화.
       # - uses: docker/login-action@v3
       #   with:
@@ -90,15 +84,15 @@ jobs:
       # GitOps 저장소를 checkout한다.
       - uses: actions/checkout@v4
         with:
-          repository: devopsbmpart/plus_poc_gitops
-          ref: main
+          repository: ${{ env.MANIFEST_REPO }}
+          ref: ${{ env.MANIFEST_REF }}
           token: ${{ secrets.REPOSITORY_ACCESS_TOKEN }}
-          path: gitops
+          path: ${{ env.MANIFEST_CHECKOUT_PATH }}
 
       #############################
       ### Modify Manifest #########
       #############################
-      # 선택한 환경의 image와 digest를 갱신한다.
+      # HK 환경의 image와 digest를 갱신한다.
       - name: Update GitOps manifest
         uses: mikefarah/yq@v4.53.2
         env:
@@ -106,7 +100,8 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         with:
           cmd: |
-            test -f "$MANIFEST_FILE"
+            manifest_file="$MANIFEST_CHECKOUT_PATH/$MANIFEST_PATH"
+            test -f "$manifest_file"
             test -n "$DIGEST"
             yq -i '
               (.spec.template.spec.containers[] | select(.name == "app").image)
@@ -114,7 +109,7 @@ jobs:
               (.spec.template.spec.containers[] | select(.name == "app").env[]
                 | select(.name == "IMAGE_DIGEST").value)
                 = strenv(DIGEST)
-            ' "$MANIFEST_FILE"
+            ' "$manifest_file"
 
       #############################
       ### Commit / Rebase / Push ##
@@ -122,24 +117,24 @@ jobs:
       # 변경이 있을 때만 rebase 후 일반 push한다.
       - name: Commit and push GitOps manifest
         run: |
-          git -C gitops add "$MANIFEST_PATH"
-          if git -C gitops diff --cached --quiet; then
+          git -C "$MANIFEST_CHECKOUT_PATH" add "$MANIFEST_PATH"
+          if git -C "$MANIFEST_CHECKOUT_PATH" diff --cached --quiet; then
             echo "Manifest is already up to date."
             exit 0
           fi
 
-          git -C gitops config user.name github-actions[bot]
-          git -C gitops config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git -C gitops commit -m "chore(deploy): ${TARGET_ENV} image digest update"
+          git -C "$MANIFEST_CHECKOUT_PATH" config user.name github-actions[bot]
+          git -C "$MANIFEST_CHECKOUT_PATH" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$MANIFEST_CHECKOUT_PATH" commit -m "chore(deploy): hk image digest update"
 
           for attempt in 1 2 3; do
-            git -C gitops fetch origin main
-            if ! git -C gitops rebase origin/main; then
-              git -C gitops rebase --abort || true
+            git -C "$MANIFEST_CHECKOUT_PATH" fetch origin "$MANIFEST_REF"
+            if ! git -C "$MANIFEST_CHECKOUT_PATH" rebase "origin/$MANIFEST_REF"; then
+              git -C "$MANIFEST_CHECKOUT_PATH" rebase --abort || true
               echo "GitOps manifest conflict detected."
               exit 1
             fi
-            if git -C gitops push origin HEAD:main; then
+            if git -C "$MANIFEST_CHECKOUT_PATH" push origin "HEAD:$MANIFEST_REF"; then
               exit 0
             fi
             echo "Push race detected; retrying (${attempt}/3)."
