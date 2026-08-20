@@ -42,8 +42,10 @@ jobs:
       IMAGE_REPOSITORY: ${{ format('docker.io/scmkim/{0}', inputs.repository_name || github.event.repository.name) }}
       IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
       TARGET_ENV: ${{ inputs.target_env || 'stg' }}
-      MANIFEST_PATH: apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
-      MANIFEST_FILE: gitops/apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
+      # MANIFEST_PATH: apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
+      # MANIFEST_FILE: apps/plus-poc-app-${{ inputs.target_env || 'stg' }}/deployment.yaml
+      MANIFEST_PATH: apps/plus-poc-app-hk/deployment.yaml
+      MANIFEST_FILE: apps/plus-poc-app-hk/deployment.yaml
     steps:
       #############################
       ### Checkout Source #########
