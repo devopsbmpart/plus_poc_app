@@ -1,4 +1,4 @@
-name: build
+name: stg-build
 
 # GitHub Actions API의 workflow_dispatch로만 실행한다.
 run-name: "[${{ inputs.ticket_no }}] ${{ inputs.repository_name }}"
