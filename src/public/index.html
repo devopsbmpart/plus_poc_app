@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>워크로드 콘솔</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <b>워크로드 콘솔</b>
+      <span>Trombone 개발 클러스터</span>
+      <span id="envbadge" class="envbadge" hidden></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="search">
+      <input id="search" type="search" placeholder="이름 · 팀 · 이미지 검색"
+             autocomplete="off" spellcheck="false" aria-label="워크로드 검색">
+    </div>
+  </header>
+
+  <section id="metrics" class="metrics" aria-label="요약"></section>
+
+  <section class="filters" aria-label="필터">
+    <span class="lbl">환경</span>
+    <div class="group">
+      <button class="chip" data-filter="env" data-value="all"  aria-pressed="true">전체</button>
+      <button class="chip" data-filter="env" data-value="prod" aria-pressed="false">prod</button>
+      <button class="chip" data-filter="env" data-value="stg"  aria-pressed="false">stg</button>
+      <button class="chip" data-filter="env" data-value="dev"  aria-pressed="false">dev</button>
+    </div>
+    <span class="lbl" style="margin-left:14px">상태</span>
+    <div class="group">
+      <button class="chip" data-filter="status" data-value="all"      aria-pressed="true">전체</button>
+      <button class="chip" data-filter="status" data-value="running"  aria-pressed="false">정상</button>
+      <button class="chip" data-filter="status" data-value="updating" aria-pressed="false">배포 중</button>
+      <button class="chip" data-filter="status" data-value="degraded" aria-pressed="false">비정상</button>
+    </div>
+  </section>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col"><button data-key="name" data-dir="↑">워크로드</button></th>
+          <th scope="col" class="col-team"><button data-key="team">팀</button></th>
+          <th scope="col"><button data-key="env">환경</button></th>
+          <th scope="col"><button data-key="status">상태</button></th>
+          <th scope="col" class="num"><button data-key="replicas">레플리카</button></th>
+          <th scope="col" class="num"><button data-key="cpu">CPU</button></th>
+          <th scope="col" class="num"><button data-key="mem">메모리</button></th>
+          <th scope="col" class="num col-restarts"><button data-key="restarts">재시작</button></th>
+          <th scope="col" class="col-node"><button data-key="node">노드</button></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <footer id="buildbar" class="buildbar" aria-label="빌드 정보"></footer>
+</div>
+
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
