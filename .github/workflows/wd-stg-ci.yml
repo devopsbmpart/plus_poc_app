@@ -38,7 +38,7 @@ jobs:
       MANIFEST_REPO: devopsbmpart/plus_poc_gitops
       MANIFEST_REF: main
       MANIFEST_CHECKOUT_PATH: gitops
-      MANIFEST_PATH: apps/plus-poc-app-hk/deployment.yaml
+      MANIFEST_PATH: apps/plus-poc-app-stg/deployment.yaml
 
     steps:
       #############################
