@@ -19,6 +19,12 @@ const PORT = Number(process.env.PORT ?? 8080);
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), 'public');
 const STARTED_AT = new Date().toISOString();
 
+/**
+ * URL 파싱용 고정 오리진. 요청에서 pathname만 쓰기 때문에 실제 호스트를 반영할 필요가 없고,
+ * 클라이언트가 보내는 Host 헤더를 끼워 넣으면 조작된 헤더 하나로 new URL이 던진다.
+ */
+const INTERNAL_ORIGIN = 'http://localhost';
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -122,7 +128,13 @@ function handleAction(res, id, action) {
 }
 
 createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+  let url;
+  try {
+    url = new URL(req.url, INTERNAL_ORIGIN);
+  } catch {
+    json(res, 400, { error: 'bad request target' });
+    return;
+  }
   const path = url.pathname;
 
   if (path === '/healthz' || path === '/readyz') {
