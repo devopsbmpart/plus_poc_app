@@ -1,0 +1,23 @@
+name: push test
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  push-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 이미지 빌드
+        run: docker build -t plus-poc-app:${GITHUB_SHA::7} .
+
+      - name: 결과 요약
+        if: always()
+        run: |
+          {
+            echo "### 빌드 결과"
+            echo "- 상태: \`${{ job.status }}\`"
+            echo "- 이미지: \`plus-poc-app:${GITHUB_SHA::7}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

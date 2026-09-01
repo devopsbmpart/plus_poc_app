@@ -1,0 +1,24 @@
+name: pr test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ develop ]
+
+jobs:
+  pr-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 문법 검사
+        run: npm run lint
+
+      - name: 결과 요약
+        if: always()
+        run: |
+          {
+            echo "### PR 테스트 결과"
+            echo "- 상태: \`${{ job.status }}\`"
+            echo "- 커밋: \`${{ github.event.pull_request.head.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
