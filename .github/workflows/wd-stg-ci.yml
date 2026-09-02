@@ -78,10 +78,17 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
-      #############################
-      ### Checkout GitOps #########
-      #############################
-      # GitOps 저장소를 checkout한다.
+
+
+
+
+
+
+
+      ##########################################
+      ### Checkout Manifest Repository #########
+      ##########################################
+      # Manifest Repository 저장소를 checkout한다.
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.MANIFEST_REPO }}
@@ -89,56 +96,53 @@ jobs:
           token: ${{ secrets.REPOSITORY_ACCESS_TOKEN }}
           path: ${{ env.MANIFEST_CHECKOUT_PATH }}
 
+
       #############################
-      ### Modify Manifest #########
+      ### Update Manifest #########
       #############################
-      # HK 환경의 image와 digest를 갱신한다.
-      - name: Update GitOps manifest
+      # STG 배포 이미지와 티켓 번호를 갱신한다.
+      - name: Update STG manifest file
         uses: mikefarah/yq@v4.53.2
         env:
-          IMAGE_REPOSITORY: ${{ env.IMAGE_REPOSITORY }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          TICKET_KEY: ${{ inputs.ticket_no }}
         with:
           cmd: |
-            manifest_file="$MANIFEST_CHECKOUT_PATH/$MANIFEST_PATH"
-            test -f "$manifest_file"
-            test -n "$DIGEST"
+            manifest="$MANIFEST_CHECKOUT_PATH/$MANIFEST_PATH"
+            test -f "$manifest" && test -n "$DIGEST"
+           # Argo CD Application이 참조하는 Manifest 저장소의
+           # STG Deployment manifest에서 app 컨테이너 설정을 갱신한다.
+           # 1. image: 저장소와 digest를 결합해 배포 이미지를 고정한다.
+           # 2. IMAGE_DIGEST: 현재 배포 이미지의 digest를 기록한다.
+           # 3. TICKET_KEY: 배포를 요청한 티켓 번호를 기록한다.
             yq -i '
-              (.spec.template.spec.containers[] | select(.name == "app").image)
-                = strenv(IMAGE_REPOSITORY) + "@" + strenv(DIGEST) |
-              (.spec.template.spec.containers[] | select(.name == "app").env[]
-                | select(.name == "IMAGE_DIGEST").value)
-                = strenv(DIGEST)
-            ' "$manifest_file"
+              (.spec.template.spec.containers[] | select(.name == "app")) |= (
+                .image = strenv(IMAGE_REPOSITORY) + "@" + strenv(DIGEST) |
+                (.env[] | select(.name == "IMAGE_DIGEST").value) = strenv(DIGEST) |
+                (.env[] | select(.name == "TICKET_KEY").value) = strenv(TICKET_KEY)
+              )
+            ' "$manifest"
 
       #############################
-      ### Commit / Rebase / Push ##
+      ### Commit and Push #########
       #############################
-      # 변경이 있을 때만 rebase 후 일반 push한다.
-      - name: Commit and push GitOps manifest
+      # 변경된 경우에만 STG manifest를 push한다.
+      - name: Commit and push STG manifest
+        working-directory: ${{ env.MANIFEST_CHECKOUT_PATH }}
+        env:
+          TICKET_NO: ${{ inputs.ticket_no }}
+          REPOSITORY_NAME: ${{ inputs.repository_name }}
         run: |
-          git -C "$MANIFEST_CHECKOUT_PATH" add "$MANIFEST_PATH"
-          if git -C "$MANIFEST_CHECKOUT_PATH" diff --cached --quiet; then
+          git add "$MANIFEST_PATH"
+
+          git diff --cached --quiet && {
             echo "Manifest is already up to date."
             exit 0
-          fi
+          }
 
-          git -C "$MANIFEST_CHECKOUT_PATH" config user.name github-actions[bot]
-          git -C "$MANIFEST_CHECKOUT_PATH" config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git -C "$MANIFEST_CHECKOUT_PATH" commit -m "chore(deploy): hk image digest update"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for attempt in 1 2 3; do
-            git -C "$MANIFEST_CHECKOUT_PATH" fetch origin "$MANIFEST_REF"
-            if ! git -C "$MANIFEST_CHECKOUT_PATH" rebase "origin/$MANIFEST_REF"; then
-              git -C "$MANIFEST_CHECKOUT_PATH" rebase --abort || true
-              echo "GitOps manifest conflict detected."
-              exit 1
-            fi
-            if git -C "$MANIFEST_CHECKOUT_PATH" push origin "HEAD:$MANIFEST_REF"; then
-              exit 0
-            fi
-            echo "Push race detected; retrying (${attempt}/3)."
-          done
-
-          echo "GitOps push failed after 3 attempts."
-          exit 1
+          git commit -m "chore(deploy): [$TICKET_NO] [stg] $REPOSITORY_NAME"
+          git pull --rebase origin "$MANIFEST_REF"
+          git push origin "HEAD:$MANIFEST_REF"
