@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { snapshot } from './data.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
+/** 데모 클러스터 보호용 상한. scale-up 을 계속 눌러 레플리카가 무한히 늘어나는 것을 막는다. */
+const MAX_REPLICAS = 10;
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), 'public');
 const STARTED_AT = new Date().toISOString();
 
@@ -101,6 +103,10 @@ function handleAction(res, id, action) {
       overrides.set(id, { ...done, status: 'running', ready: done.replicas ?? current.replicas });
     }, 6000);
   } else if (action === 'scale-up') {
+    if (current.replicas >= MAX_REPLICAS) {
+      json(res, 400, { error: `레플리카를 ${MAX_REPLICAS}개보다 많이 늘릴 수 없습니다` });
+      return;
+    }
     next.replicas = current.replicas + 1;
     next.ready = next.replicas;
     message = `${current.name} 레플리카를 ${next.replicas}개로 늘렸습니다`;
