@@ -1,0 +1,31 @@
+### GitHub Actions workflow_dispatch trigger
+###
+### Required environment variable:
+###   GITHUB_TOKEN=<PAT with Actions: write permission>
+###
+### JetBrains HTTP Client reads {{$dotenv GITHUB_TOKEN}} from a .env file.
+### Never commit the token or the .env file.
+
+
+### Rest env set .env
+
+@owner = devopsbmpart
+@repo = plus_poc_app
+@workflow = new-build.yml
+@ref = develop
+@image_repository = ghcr.io/devopsbmpart/plus_poc_app
+@image_tag = manual-demo
+
+POST https://api.github.com/repos/{{owner}}/{{repo}}/actions/workflows/{{workflow}}/dispatches
+Authorization: Bearer {{GITHUB_TOKEN}}
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+
+{
+  "ref": "{{ref}}",
+  "inputs": {
+    "image_repository": "{{image_repository}}",
+    "image_tag": "{{image_tag}}"
+  }
+}
