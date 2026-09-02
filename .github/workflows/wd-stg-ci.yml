@@ -110,11 +110,11 @@ jobs:
           cmd: |
             manifest="$MANIFEST_CHECKOUT_PATH/$MANIFEST_PATH"
             test -f "$manifest" && test -n "$DIGEST"
-           # Argo CD Application이 참조하는 Manifest 저장소의
-           # STG Deployment manifest에서 app 컨테이너 설정을 갱신한다.
-           # 1. image: 저장소와 digest를 결합해 배포 이미지를 고정한다.
-           # 2. IMAGE_DIGEST: 현재 배포 이미지의 digest를 기록한다.
-           # 3. TICKET_KEY: 배포를 요청한 티켓 번호를 기록한다.
+            # Argo CD Application이 참조하는 Manifest 저장소의
+            # STG Deployment manifest에서 app 컨테이너 설정을 갱신한다.
+            # 1. image: 저장소와 digest를 결합해 배포 이미지를 고정한다.
+            # 2. IMAGE_DIGEST: 현재 배포 이미지의 digest를 기록한다.
+            # 3. TICKET_KEY: 배포를 요청한 티켓 번호를 기록한다.
             yq -i '
               (.spec.template.spec.containers[] | select(.name == "app")) |= (
                 .image = strenv(IMAGE_REPOSITORY) + "@" + strenv(DIGEST) |
