@@ -126,7 +126,15 @@ createServer((req, res) => {
   const path = url.pathname;
 
   if (path === '/healthz' || path === '/readyz') {
-    json(res, 200, { ok: true });
+    // 헬스체크만으로 어느 버전이 떠 있는지 판별할 수 있게 한다.
+    // 배포 직후 파드가 구버전인지 신버전인지 확인할 때 /api/build 까지 가지 않아도 된다.
+    json(res, 200, {
+      ok: true,
+      version: process.env.APP_VERSION || '0.3.0',
+      env: process.env.APP_ENV || null,
+      uptimeSeconds: Math.floor(process.uptime()),
+      startedAt: STARTED_AT,
+    });
     return;
   }
   if (path === '/api/build' || path === '/info') {
